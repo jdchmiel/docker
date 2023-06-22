@@ -1,0 +1,90 @@
+version: '3.3'
+services:
+  confluence-server:
+    depends_on:
+      - postgres-server
+    environment:
+      - JVM_MINIMUM_MEMORY=$JVM_MIN
+      - JVM_MAXIMUM_MEMORY=$JVM_MAX
+      - JVM_RESERVED_CODE_CACHE_SIZE=$JVM_HEAP
+      - ATL_JDBC_URL=jdbc:postgresql://10.0.0.4:5432/$DB_CONF
+      - ATL_DB_TYPE=postgresql
+      - ATL_DB_USER=$DB_USER
+      - ATL_JDBC_PASSWORD=$DB_PASS
+      - ATL_PROXY_NAME=chmielecki.local
+      - ATL_PROXY_PORT=443
+      - ATL_TOMCAT_SCHEME=$TOMCAT_SCHEME
+      - ATL_TOMCAT_SECURE=$TOMCAT_SECURE
+      - ATL_TOMCAT_CONTEXTPATH=wiki
+    volumes:
+      - 'conf-data:/var/atlassian/application-data/confluence'
+    container_name: confluence
+    ports:
+      - '8090:8090'
+      - '8091:8091'
+    image: 'atlassian/confluence-server:8.3.2-ubuntu-jdk17'
+    restart: unless-stopped
+    networks:
+      jiranetwork:
+        ipv4_address: 10.10.0.5
+  
+  jira-server:
+    depends_on:
+      - postgres-server
+    environment:
+      - JVM_MINIMUM_MEMORY=$JVM_MIN
+      - JVM_MAXIMUM_MEMORY=$JVM_MAX
+      - JVM_RESERVED_CODE_CACHE_SIZE=$JVM_HEAP
+      - ATL_JDBC_URL=jdbc:postgresql://10.0.0.4:5432/$DB_JIRA
+      - ATL_DB_TYPE=postgresql
+      - ATL_DB_USER=$DB_USER
+      - ATL_JDBC_PASSWORD=$DB_PASS
+      - ATL_TOMCAT_PORT=8100
+      - ATL_PROXY_NAME=chmielecki.local
+      - ATL_PROXY_PORT=443
+      - ATL_TOMCAT_SCHEME=$TOMCAT_SCHEME
+      - ATL_TOMCAT_SECURE=$TOMCAT_SECURE
+      - ATL_TOMCAT_CONTEXTPATH=jira
+    volumes:
+      - 'jira-data:/var/atlassian/application-data/jira'
+    container_name: jira
+    ports:
+      - '8100:8100'
+    image: 'atlassian/jira-software:9.4.7-ubuntu-jdk11'
+    restart: unless-stopped
+    networks:
+      jiranetwork:
+        ipv4_address: 10.10.0.6
+    
+  postgres-server:
+    environment:
+      - POSTGRES_PASSWORD=$PGPASSWORD
+      - POSTGRES_USER=$PGUSER
+      - DB_USER
+      - DB_PASS
+      - DB_CONF
+      - DB_JIRA
+
+    volumes:
+      - 'pg-data:/var/lib/postgresql/data'
+      - './db_init.sh:/docker-entrypoint-initdb.d/db_init.sh'
+    container_name: postgres
+    ports:
+      - '5432:5432'
+    image: postgres:alpine3.18
+    networks:
+      jiranetwork:
+        ipv4_address: 10.10.0.4
+
+volumes:
+  pg-data: {}
+  conf-data: {}
+  jira-data: {}
+
+networks:
+  jiranetwork:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.10.0.0/24
